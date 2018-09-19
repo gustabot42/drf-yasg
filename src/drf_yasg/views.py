@@ -10,9 +10,12 @@ from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.views import APIView
 
+from drf_yasg import openapi
+
 from .app_settings import swagger_settings
 from .renderers import (
-    OpenAPIRenderer, ReDocOldRenderer, ReDocRenderer, SwaggerJSONRenderer, SwaggerUIRenderer, SwaggerYAMLRenderer
+    OpenAPIRenderer, ReDocOldRenderer, ReDocRenderer, SwaggerJSONRenderer, SwaggerUIRenderer, SwaggerYAMLRenderer,
+    _SpecRenderer
 )
 
 SPEC_RENDERERS = (SwaggerYAMLRenderer, SwaggerJSONRenderer, OpenAPIRenderer)
@@ -85,11 +88,16 @@ def get_schema_view(info=None, url=None, patterns=None, urlconf=None, public=Fal
         renderer_classes = _spec_renderers
 
         def get(self, request, version='', format=None):
-            generator = self.generator_class(info, request.version or version or '', url, patterns, urlconf)
-            schema = generator.get_schema(request, self.public)
-            if schema is None:
-                raise exceptions.PermissionDenied()  # pragma: no cover
-            return Response(schema)
+            if isinstance(request.accepted_renderer, _SpecRenderer):
+                generator = self.generator_class(info, request.version or version or '', url, patterns, urlconf)
+                schema = generator.get_schema(request, self.public)
+                if schema is None:
+                    raise exceptions.PermissionDenied()  # pragma: no cover
+                return Response(schema)
+            else:
+                generator = self.generator_class(info, request.version or version or '', url, patterns=[])
+                schema = generator.get_schema(request, self.public)
+                return Response(schema)
 
         @classmethod
         def apply_cache(cls, view, cache_timeout, cache_kwargs):
